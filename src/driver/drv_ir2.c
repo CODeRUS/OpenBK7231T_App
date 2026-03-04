@@ -274,6 +274,10 @@ static commandResult_t CMD_IR2_SetupIR2(const void* context, const char* cmd, co
 	float duty_off_frac = Tokenizer_GetArgFloatDefault(2, 0.0f);
 //	txpin = Tokenizer_GetArgIntegerDefault(3, 26);
 	txpin = Tokenizer_GetPin(3, 26);
+	if (duty_on_frac < 0.0f) duty_on_frac = 0.0f;
+	if (duty_on_frac > 1.0f) duty_on_frac = 1.0f;
+	if (duty_off_frac < 0.0f) duty_off_frac = 0.0f;
+	if (duty_off_frac > 1.0f) duty_off_frac = 1.0f;
 
 #if DEBUG_WAVE_WITH_GPIO
 	bk_gpio_config_output(txpin);
@@ -281,13 +285,15 @@ static commandResult_t CMD_IR2_SetupIR2(const void* context, const char* cmd, co
 	pwmIndex = PIN_GetPWMIndexForPinIndex(txpin);
 	// is this pin capable of PWM?
 	if (pwmIndex != -1) {
+#if PLATFORM_BEKEN
+		uint32_t pwmfrequency = 38000;
+		period = (26000000 / pwmfrequency);
+		duty_on = (uint32_t)(period * duty_on_frac);
+		duty_off = (uint32_t)(period * duty_off_frac);
+#endif
 #if PLATFORM_BK7231N
 		group = get_set_group(pwmIndex);
 		channel = get_set_channel(pwmIndex);
-		uint32_t pwmfrequency = 38000;
-		period = (26000000 / pwmfrequency);
-		duty_on = period * duty_on_frac;
-		duty_off = period * duty_off_frac;
 		if (channel == 0) {
 			reg_duty = REG_GROUP_PWM0_T1_ADDR(group);
 		}
@@ -306,6 +312,9 @@ static commandResult_t CMD_IR2_SetupIR2(const void* context, const char* cmd, co
 
 		MY_SET_DUTY(duty_off);
 #endif
+	}
+	else {
+		ADDLOG_ERROR(LOG_FEATURE_IR, "SetupIR2: pin %i has no PWM channel", txpin);
 	}
 #endif
 
