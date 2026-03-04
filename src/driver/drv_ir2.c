@@ -244,7 +244,10 @@ static commandResult_t CMD_IR2_SendIR2(const void* context, const char* cmd, con
 			args++;
 		}
 	}
-	state = 0;
+	// Most raw IR dumps (for example from Flipper) start with MARK.
+	// Start from ON state so the first duration in queue is emitted as carrier.
+	state = 1;
+	curTime = 0;
 	ADDLOG_INFO(LOG_FEATURE_IR, "Queue size %i", (stop - times));
 
 
@@ -253,6 +256,10 @@ static commandResult_t CMD_IR2_SendIR2(const void* context, const char* cmd, con
 #elif PLATFORM_BEKEN
 	bk_pwm_update_param((bk_pwm_t)pwmIndex, period, duty_off);
 #endif
+
+	if (stop > times) {
+		MY_SET_DUTY(duty_on);
+	}
 
 	cur = times;
 #if WINDOWS
