@@ -171,6 +171,7 @@ int state = 0;
 int pwmIndex = -1;
 unsigned int period;
 int ir2_repeats_remaining = 0;
+int ir2_default_repeats = 2;
 
 static uint8_t group, channel;
 
@@ -234,7 +235,7 @@ static commandResult_t CMD_IR2_SendIR2(const void* context, const char* cmd, con
 	float frequency = 38000;
 	float duty_cycle = 0.330000f;
 	stop = times;
-	int repeats = 1;
+	int repeats = ir2_default_repeats;
 	int tokenIndex = 0;
 	int firstTokenValue = 0;
 	bool firstTokenParsed = false;
@@ -313,6 +314,20 @@ static commandResult_t CMD_IR2_SendIR2(const void* context, const char* cmd, con
 		SendIR2_ISR(0);
 	}
 #endif
+	return CMD_RES_OK;
+}
+
+// IR2_Repeats [count]
+static commandResult_t CMD_IR2_Repeats(const void* context, const char* cmd, const char* args, int cmdFlags) {
+	Tokenizer_TokenizeString(args, 0);
+	ir2_default_repeats = Tokenizer_GetArgIntegerDefault(0, ir2_default_repeats);
+	if (ir2_default_repeats < 1) {
+		ir2_default_repeats = 1;
+	}
+	if (ir2_default_repeats > 20) {
+		ir2_default_repeats = 20;
+	}
+	ADDLOG_INFO(LOG_FEATURE_IR, "IR2 default repeats: %i", ir2_default_repeats);
 	return CMD_RES_OK;
 }
 // SetupIR2 [myPeriodUs] [dutyOnFrac] [dutyOffFrac] [txPin]
@@ -423,6 +438,11 @@ void DRV_IR2_Init() {
 	//cmddetail:"fn":"CMD_IR2_SendIR2","file":"driver/drv_ir2.c","requires":"",
 	//cmddetail:"examples":""}
 	CMD_RegisterCommand("SendIR2", CMD_IR2_SendIR2, NULL);
+	//cmddetail:{"name":"IR2_Repeats","args":"[count]",
+	//cmddetail:"descr":"Sets default repeat count for SendIR2 when repeats arg is omitted",
+	//cmddetail:"fn":"CMD_IR2_Repeats","file":"driver/drv_ir2.c","requires":"",
+	//cmddetail:"examples":""}
+	CMD_RegisterCommand("IR2_Repeats", CMD_IR2_Repeats, NULL);
 
 }
 
