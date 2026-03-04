@@ -227,8 +227,6 @@ static commandResult_t CMD_IR2_SendIR2(const void* context, const char* cmd, con
 	ADDLOG_INFO(LOG_FEATURE_IR, "SendIR2 args len: %i", strlen(args));
 
 	// parse string like 10 12 432 432 432 432 432
-	*stop = 500; // prepend 500us zero
-	stop++;
 	while (*args) {
 		while (*args && isWhiteSpace(*args)) {
 			args++;
