@@ -234,28 +234,50 @@ backlog startDriver IR2; SetupIR2 50 0.5 0 9
 static commandResult_t CMD_IR2_SendIR2(const void* context, const char* cmd, const char* args, int cmdFlags) {
 	float frequency = 38000;
 	float duty_cycle = 0.330000f;
+	const char *p = args;
 	stop = times;
 	int repeats = ir2_default_repeats;
 	int tokenIndex = 0;
-	int firstTokenValue = 0;
 	bool firstTokenParsed = false;
+	bool explicitRaw = false;
+	bool usedFirstAsRepeat = false;
 
 	ADDLOG_INFO(LOG_FEATURE_IR, "SendIR2 args len: %i", strlen(args));
 
-	// parse string like 10 12 432 432 432 432 432
-	while (*args) {
-		while (*args && isWhiteSpace(*args)) {
-			args++;
+	// parse string like:
+	// 10 12 432 432 ...
+	// raw:3060,3060,4406,646,...
+	while (*p) {
+		while (*p && (isWhiteSpace(*p) || *p == ',')) {
+			p++;
+		}
+		if (!*p) {
+			break;
+		}
+		if ((p[0] == 'r' || p[0] == 'R')
+			&& (p[1] == 'a' || p[1] == 'A')
+			&& (p[2] == 'w' || p[2] == 'W')
+			&& p[3] == ':') {
+			explicitRaw = true;
+			p += 4;
+			continue;
 		}
 		if (stop - times < maxTimes) {
-			int x = atoi(args);
+			char *endPtr;
+			long parsed = strtol(p, &endPtr, 10);
+			int x;
+			if (endPtr == p) {
+				ADDLOG_ERROR(LOG_FEATURE_IR, "SendIR2 parse error near: %s", p);
+				return CMD_RES_BAD_ARGUMENT;
+			}
+			x = (int)parsed;
 			if (tokenIndex == 0) {
-				firstTokenValue = x;
 				firstTokenParsed = true;
 				// Backward compatibility: if the first value looks like a pulse duration,
 				// treat it as data (legacy format without repeats parameter).
-				if (x > 0 && x <= 20) {
+				if (!explicitRaw && x > 0 && x <= 20) {
 					repeats = x;
+					usedFirstAsRepeat = true;
 				}
 				else {
 					*stop = x;
@@ -269,12 +291,10 @@ static commandResult_t CMD_IR2_SendIR2(const void* context, const char* cmd, con
 				stop++;
 			}
 			tokenIndex++;
+			p = endPtr;
 		}
 		else {
 			break;
-		}
-		while (*args && !isWhiteSpace(*args)) {
-			args++;
 		}
 	}
 	if (!firstTokenParsed) {
@@ -291,7 +311,7 @@ static commandResult_t CMD_IR2_SendIR2(const void* context, const char* cmd, con
 	ADDLOG_INFO(LOG_FEATURE_IR, "Queue size %i, repeats %i%s",
 		(stop - times),
 		repeats,
-		(firstTokenValue > 20 || firstTokenValue <= 0) ? " (legacy format)" : "");
+		explicitRaw ? " (raw format)" : (usedFirstAsRepeat ? "" : " (legacy format)"));
 
 
 #if PLATFORM_BK7231N && !PLATFORM_BEKEN_NEW
