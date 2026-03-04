@@ -170,6 +170,7 @@ int curTime = 0;
 int state = 0;
 int pwmIndex = -1;
 unsigned int period;
+int ir2_repeats_remaining = 0;
 
 static uint8_t group, channel;
 
@@ -200,10 +201,20 @@ void SendIR2_ISR(uint8_t t) {
 		}
 		cur++;
 		if (cur == stop) {
-			// done
-			cur = 0;
-
-			MY_SET_DUTY(duty_off);
+			if (ir2_repeats_remaining > 1) {
+				ir2_repeats_remaining--;
+				// restart from MARK for next frame
+				cur = times;
+				state = 1;
+				curTime = 0;
+				MY_SET_DUTY(duty_on);
+			}
+			else {
+				// done
+				cur = 0;
+				ir2_repeats_remaining = 0;
+				MY_SET_DUTY(duty_off);
+			}
 		}
 	}
 }
@@ -223,6 +234,10 @@ static commandResult_t CMD_IR2_SendIR2(const void* context, const char* cmd, con
 	float frequency = 38000;
 	float duty_cycle = 0.330000f;
 	stop = times;
+	int repeats = 1;
+	int tokenIndex = 0;
+	int firstTokenValue = 0;
+	bool firstTokenParsed = false;
 
 	ADDLOG_INFO(LOG_FEATURE_IR, "SendIR2 args len: %i", strlen(args));
 
@@ -233,9 +248,26 @@ static commandResult_t CMD_IR2_SendIR2(const void* context, const char* cmd, con
 		}
 		if (stop - times < maxTimes) {
 			int x = atoi(args);
-			*stop = x;
-			ADDLOG_INFO(LOG_FEATURE_IR, "Value: %i", x);
-			stop++;
+			if (tokenIndex == 0) {
+				firstTokenValue = x;
+				firstTokenParsed = true;
+				// Backward compatibility: if the first value looks like a pulse duration,
+				// treat it as data (legacy format without repeats parameter).
+				if (x > 0 && x <= 20) {
+					repeats = x;
+				}
+				else {
+					*stop = x;
+					ADDLOG_INFO(LOG_FEATURE_IR, "Value: %i", x);
+					stop++;
+				}
+			}
+			else {
+				*stop = x;
+				ADDLOG_INFO(LOG_FEATURE_IR, "Value: %i", x);
+				stop++;
+			}
+			tokenIndex++;
 		}
 		else {
 			break;
@@ -244,11 +276,21 @@ static commandResult_t CMD_IR2_SendIR2(const void* context, const char* cmd, con
 			args++;
 		}
 	}
+	if (!firstTokenParsed) {
+		return CMD_RES_BAD_ARGUMENT;
+	}
+	if (repeats < 1) {
+		repeats = 1;
+	}
+	ir2_repeats_remaining = repeats;
 	// Most raw IR dumps (for example from Flipper) start with MARK.
 	// Start from ON state so the first duration in queue is emitted as carrier.
 	state = 1;
 	curTime = 0;
-	ADDLOG_INFO(LOG_FEATURE_IR, "Queue size %i", (stop - times));
+	ADDLOG_INFO(LOG_FEATURE_IR, "Queue size %i, repeats %i%s",
+		(stop - times),
+		repeats,
+		(firstTokenValue > 20 || firstTokenValue <= 0) ? " (legacy format)" : "");
 
 
 #if PLATFORM_BK7231N && !PLATFORM_BEKEN_NEW
@@ -259,6 +301,10 @@ static commandResult_t CMD_IR2_SendIR2(const void* context, const char* cmd, con
 
 	if (stop > times) {
 		MY_SET_DUTY(duty_on);
+	}
+	else {
+		ir2_repeats_remaining = 0;
+		return CMD_RES_BAD_ARGUMENT;
 	}
 
 	cur = times;
