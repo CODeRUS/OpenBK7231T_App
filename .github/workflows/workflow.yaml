@@ -11,6 +11,49 @@ env:
   APP_NAME: ${{ github.event.repository.name }}
 
 jobs:
+  build_bk7231n:
+    name: Build (OpenBK7231N, default)
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Source checkout
+        uses: actions/checkout@v4
+
+      - name: Install arm-none-eabi-gcc
+        run: |
+          curl -sL https://raw.githubusercontent.com/ilikenwf/apt-fast/master/quick-install.sh | sudo bash
+          sudo apt-get update
+          sudo apt-fast install -y gcc-arm-none-eabi
+
+      - name: Set build version
+        id: ver
+        run: |
+          echo "version=${GITHUB_REF_NAME}_$(git rev-parse --short=12 HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Run make
+        run: make APP_VERSION=${{ steps.ver.outputs.version }} APP_NAME=OpenBK7231N VARIANT="default" OpenBK7231N
+
+      - name: Save build assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}_${{ steps.ver.outputs.version }}_OpenBK7231N
+          path: |
+            output/${{ steps.ver.outputs.version }}/OpenBK7231N_UA_${{ steps.ver.outputs.version }}.bin
+            output/${{ steps.ver.outputs.version }}/OpenBK7231N_UG_${{ steps.ver.outputs.version }}.bin
+            output/${{ steps.ver.outputs.version }}/OpenBK7231N_UG_${{ steps.ver.outputs.version }}.img
+            output/${{ steps.ver.outputs.version }}/OpenBK7231N_QIO_${{ steps.ver.outputs.version }}.bin
+            output/${{ steps.ver.outputs.version }}/OpenBK7231M_QIO_${{ steps.ver.outputs.version }}.bin
+            output/${{ steps.ver.outputs.version }}/OpenBK7231M_ALT_QIO_${{ steps.ver.outputs.version }}.bin
+            output/${{ steps.ver.outputs.version }}/OpenBK7231N_${{ steps.ver.outputs.version }}.rbl
+            output/${{ steps.ver.outputs.version }}/OpenBK7231N_${{ steps.ver.outputs.version }}.img
+            output/${{ steps.ver.outputs.version }}/OpenBK7231N_${{ steps.ver.outputs.version }}.bin
+            output/${{ steps.ver.outputs.version }}/OpenBK7231N_${{ steps.ver.outputs.version }}.fls
+            output/${{ steps.ver.outputs.version }}/OpenBK7231N_${{ steps.ver.outputs.version }}_ota.img
+            output/${{ steps.ver.outputs.version }}/OpenBK7231N_${{ steps.ver.outputs.version }}_gz.img
+            output/${{ steps.ver.outputs.version }}/OpenBK7231N_${{ steps.ver.outputs.version }}_OTA.bin
+            output/${{ steps.ver.outputs.version }}/OpenBK7231N_${{ steps.ver.outputs.version }}_OTA.bin.xz
+            output/${{ steps.ver.outputs.version }}/OpenBK7231N_${{ steps.ver.outputs.version }}_OTA.bin.xz.ota
+          if-no-files-found: warn
+
   build:
     name: Build (OpenBK7238, default, apt)
     runs-on: ubuntu-22.04
