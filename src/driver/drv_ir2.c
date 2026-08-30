@@ -161,8 +161,8 @@ static uint32_t reg_duty;
 
 int txpin = 26;
 
-int times[512];
-int maxTimes = 512;
+int times[1024];
+int maxTimes = 1024;
 int *cur;
 int *stop;
 int myPeriodUs = 50;
