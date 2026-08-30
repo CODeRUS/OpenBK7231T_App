@@ -48,8 +48,8 @@
  *
  */
 
-#define MQTT_OUTPUT_RINGBUF_SIZE 2048
-#define MQTT_VAR_HEADER_BUFFER_LEN 256
+#define MQTT_OUTPUT_RINGBUF_SIZE 4096
+#define MQTT_VAR_HEADER_BUFFER_LEN 4096
 #define MQTT_REQ_MAX_IN_FLIGHT 16
 
 #include "lwip/apps/mqtt.h"

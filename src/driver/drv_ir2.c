@@ -281,13 +281,11 @@ static commandResult_t CMD_IR2_SendIR2(const void* context, const char* cmd, con
 				}
 				else {
 					*stop = x;
-					ADDLOG_INFO(LOG_FEATURE_IR, "Value: %i", x);
 					stop++;
 				}
 			}
 			else {
 				*stop = x;
-				ADDLOG_INFO(LOG_FEATURE_IR, "Value: %i", x);
 				stop++;
 			}
 			tokenIndex++;

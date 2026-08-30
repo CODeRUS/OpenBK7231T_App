@@ -10,6 +10,17 @@ SRC_C += $(BERRY_SRC_C)
 CPPDEFINES += -DOBK_VARIANT=$(OBK_VARIANT)
 CPPDEFINES += -D__FILE__=\"\" -Wno-builtin-macro-redefined
 
+# The SDK's lwip-2.1.3 mqtt.c is the older 2.1.2-era code that corrupts
+# incoming PUBLISH messages spanning several TCP segments; swap it for the
+# app's fixed copy (see libraries/mqtt_patched_beken.c). This runs after the
+# SDK's application.mk has already added its mqtt.c, so filter-out works.
+ifneq ($(filter $(TARGET_PLATFORM),bk7231n bk7231t),)
+ifeq ($(CFG_LWIP_2_1_3),1)
+SRC_C := $(filter-out ./beken378/func/lwip_intf/lwip-2.1.3/src/apps/mqtt/mqtt.c,$(SRC_C))
+SRC_C += $(OBK_DIR)/libraries/mqtt_patched_beken.c
+endif
+endif
+
 ifeq ($(TARGET_PLATFORM),bk7231n)
 
 CFG_USE_MQTT_TLS ?= 0

@@ -102,7 +102,9 @@ int mqtt_rx_buffer_head;
 int mqtt_rx_buffer_tail;
 int mqtt_rx_buffer_count;
 unsigned char temp_topic[128];
-unsigned char temp_data[2048];
+unsigned char temp_data[MQTT_RX_BUFFER_MAX];
+static unsigned char mqtt_inpub_accum[MQTT_RX_BUFFER_MAX];
+static int mqtt_inpub_accum_len;
 
 int addLenData(int len, const unsigned char *data){
 	mqtt_rx_buffer[mqtt_rx_buffer_head] = (len >> 8) & 0xff;
@@ -1008,6 +1010,9 @@ void MQTT_OBK_Printf(char* s) {
 static void mqtt_incoming_data_cb(void* arg, const u8_t* data, u16_t len, u8_t flags)
 {
 	int i;
+#ifndef MQTT_DATA_FLAG_LAST
+#define MQTT_DATA_FLAG_LAST 1
+#endif
 	// unused - left here as example
 	//const struct mqtt_connect_client_info_t* client_info = (const struct mqtt_connect_client_info_t*)arg;
 
@@ -1017,6 +1022,19 @@ static void mqtt_incoming_data_cb(void* arg, const u8_t* data, u16_t len, u8_t f
 		// note: data is NOT terminated (it may be binary...).
 		g_mqtt_request.received = data;
 		g_mqtt_request.receivedLen = len;
+
+		if (mqtt_inpub_accum_len + (int)len > (int)sizeof(mqtt_inpub_accum)) {
+			addLogAdv(LOG_ERROR, LOG_FEATURE_MQTT, "MQTT incoming payload overflow (%i+%i)", mqtt_inpub_accum_len, (int)len);
+			mqtt_inpub_accum_len = 0;
+			return;
+		}
+		if (len > 0) {
+			memcpy(mqtt_inpub_accum + mqtt_inpub_accum_len, data, len);
+			mqtt_inpub_accum_len += len;
+		}
+		if ((flags & MQTT_DATA_FLAG_LAST) == 0) {
+			return;
+		}
 
 		//addLogAdv(LOG_INFO, LOG_FEATURE_MQTT, "MQTT in topic %s", g_mqtt_request.topic);
 		mqtt_received_events++;
@@ -1028,7 +1046,7 @@ static void mqtt_incoming_data_cb(void* arg, const u8_t* data, u16_t len, u8_t f
 			char* cbtopic = callbacks[i]->topic;
 			if (!strncmp(g_mqtt_request.topic, cbtopic, strlen(cbtopic)))
 			{
-				MQTT_Post_Received(g_mqtt_request.topic, strlen(g_mqtt_request.topic), data, len);
+				MQTT_Post_Received(g_mqtt_request.topic, strlen(g_mqtt_request.topic), mqtt_inpub_accum, mqtt_inpub_accum_len);
 				// if ANYONE is interested, store it.
 				break;
 				// note - callback must return 1 to say it ate the mqtt, else further processing can be performed.
@@ -1039,6 +1057,7 @@ static void mqtt_incoming_data_cb(void* arg, const u8_t* data, u16_t len, u8_t f
 				//}
 			}
 		}
+		mqtt_inpub_accum_len = 0;
 		//addLogAdv(LOG_INFO, LOG_FEATURE_MQTT, "MQTT topic not handled: %s", g_mqtt_request.topic);
 	}
 }
@@ -1090,6 +1109,7 @@ static void mqtt_incoming_publish_cb(void* arg, const char* topic, u32_t tot_len
 	//const struct mqtt_connect_client_info_t* client_info = (const struct mqtt_connect_client_info_t*)arg;
 
 	// look for a callback with this URL and method, or HTTP_ANY
+	mqtt_inpub_accum_len = 0;
 	g_mqtt_request.topic[0] = '\0';
 	for (i = 0; i < numCallbacks; i++)
 	{

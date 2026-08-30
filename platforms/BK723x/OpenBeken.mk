@@ -25,6 +25,8 @@ endif
 
 SRC_C += ./fixes/blank.c
 APP_C += $(OBK_DIR)/../platforms/BK723x/ps.c
+# Replaces the SDK's broken lwip mqtt.c (see comment inside the wrapper)
+APP_C += $(OBK_DIR)/../libraries/mqtt_patched_beken.c
 
 APP_C += $(OBK_DIR)/hal/bk7231/hal_adc_bk7231.c
 APP_C += $(OBK_DIR)/hal/bk7231/hal_flashConfig_bk7231.c
